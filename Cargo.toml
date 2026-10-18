@@ -1,0 +1,25 @@
+[package]
+name = "digger"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+description = "A cross-platform Rust remake of the 1983 classic Digger"
+license = "GPL-2.0-or-later"
+repository = ""
+# The archival reference sources are development-only. Never package them.
+exclude = ["ref/**", "/ref", "digger.sco"]
+
+[dependencies]
+winit = "0.30.13"
+softbuffer = "0.4"
+cpal = "0.18.2"
+gilrs = "0.11.2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 1

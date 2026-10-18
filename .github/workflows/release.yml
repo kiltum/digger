@@ -1,0 +1,64 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: macos-latest
+            name: macos-universal
+          - os: windows-latest
+            name: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Add macOS targets
+        if: matrix.name == 'macos-universal'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-dev libxcb1-dev pkg-config
+      - name: Build (Linux / Windows)
+        if: matrix.name != 'macos-universal'
+        run: cargo build --release
+      - name: Build (macOS universal)
+        if: matrix.name == 'macos-universal'
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p dist
+          lipo -create \
+            target/aarch64-apple-darwin/release/digger \
+            target/x86_64-apple-darwin/release/digger \
+            -output dist/digger-macos-universal
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/digger.exe dist/digger-windows-x86_64.exe
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            cp target/release/digger dist/digger-linux-x86_64
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digger-${{ matrix.name }}
+          path: dist/*
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/*
